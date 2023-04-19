@@ -3,22 +3,26 @@ import neopixel
 import RPi.GPIO as GPIO
 import time
 import random
+import subprocess
 
+two_player = True
 gameboard = [[0 for i in range(6)] for j in range(7)]
 current_player = 1
+move_series = ""
 
 def button_press(btn):
-	global gameboard, current_player
+	global gameboard, current_player, move_series
 	try:
 		index = gameboard[btn].index(0)
 	except ValueError:
 		return
 	gameboard[btn][index] = current_player
+	move_series += str(btn + 1)
 	won = check_win(gameboard)
 	if won:
 		for i in range(50):
 			update_lights()
-			time.sleep(0.1)
+			time.sleep(0.5)
 		pixels.fill(0)
 		pixels.show()
 		gameboard = [[0 for i in range(6)] for j in range(7)]
@@ -26,7 +30,31 @@ def button_press(btn):
 	else:
 		current_player = -current_player
 		update_lights()
+		if (current_player == 1 and two_player):
+			button_press(next_move(gameboard, move_series))
 
+def get_solution(ms):
+    try:
+        output = subprocess.check_output(["./solver/a.out", ms], stderr=subprocess.STDOUT, timeout=0.5)
+        return int(output.decode())
+    except subprocess.TimeoutExpired:
+        return 0
+
+def next_move(gb, ms):
+    min_score = 21
+    min_columns = []
+    for i in range(7):
+        try:
+            gb[i].index(0)
+        except ValueError:
+            continue
+        sol = get_solution(ms + str(i + 1))
+        if sol == min_score:
+            min_columns.append(i)
+        elif sol < min_score:
+            min_score = sol
+            min_columns = [i]
+    return random.choice(min_columns)
 
 def check_win(gb):
 	# Check horizontal win -
