@@ -9,9 +9,13 @@ two_player = True
 gameboard = [[0 for i in range(6)] for j in range(7)]
 current_player = 1
 move_series = ""
+reset_time = 0
+COOLDOWN = 0.5
 
 def button_press(btn):
-	global gameboard, current_player, move_series
+	if time() - reset_time < COOLDOWN:
+		return
+	global gameboard, current_player, move_series, reset_time
 	try:
 		index = gameboard[btn].index(0)
 	except ValueError:
@@ -20,18 +24,26 @@ def button_press(btn):
 	move_series += str(btn + 1)
 	won = check_win(gameboard)
 	if won:
-		for i in range(50):
+		for i in range(10):
 			update_lights()
 			time.sleep(0.5)
 		pixels.fill(0)
 		pixels.show()
 		gameboard = [[0 for i in range(6)] for j in range(7)]
 		current_player = 1
+		reset_time = time()
 	else:
 		current_player = -current_player
 		update_lights()
 		if (current_player == 1 and two_player):
 			button_press(next_move(gameboard, move_series))
+		elif len(move_series) == 42:
+			time.sleep(5)
+			pixels.fill(0)
+			pixels.show()
+			gameboard = [[0 for i in range(6)] for j in range(7)]
+			current_player = 1
+			reset_time = time()
 
 def get_solution(ms):
     try:
@@ -140,7 +152,6 @@ BUTTONS = [
 GPIO.setup(BUTTONS, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 last_press = time.time()
-COOLDOWN = 0.5
 
 def button_callback(btn):
 	global last_press
