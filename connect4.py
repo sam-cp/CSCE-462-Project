@@ -15,54 +15,67 @@ can_press_button = threading.Lock()
 game_started = False
 
 def button_press(btn):
-	global gameboard, current_player, move_series, game_started
-	try:
-		index = gameboard[btn].index(0)
-	except ValueError:
-		return
-	gameboard[btn][index] = current_player
-	move_series += str(btn + 1)
-	won = check_win(gameboard)
-	if won:
-		for i in range(10):
-			update_lights()
-			time.sleep(0.5)
-		game_started = False
-		update_lights()
-	else:
-		current_player = -current_player
-		update_lights()
-		if (not two_player):
-			if current_player == 1:
-				button_press(next_move(gameboard, move_series))
-		else:
-			if len(move_series) == 42:
-				time.sleep(5)
-				game_started = False
+	global gameboard, current_player, move_series, game_started, can_press_button
+	if game_started:
+		try:
+			index = gameboard[btn].index(0)
+		except ValueError:
+			return
+		gameboard[btn][index] = current_player
+		move_series += str(btn + 1)
+		won = check_win(gameboard)
+		if won:
+			for i in range(10):
 				update_lights()
+				time.sleep(0.5)
+			game_started = False
+			update_lights()
+			can_press_button.release()
+		else:
+			current_player = -current_player
+			update_lights()
+			if (not two_player):
+				if current_player == -1:
+					button_press(next_move(gameboard, move_series))
+				else:
+					can_press_button.release()
+			else:
+				if len(move_series) == 42:
+					time.sleep(5)
+					game_started = False
+					update_lights()
+				can_press_button.release()
+	else:
+		if btn == 0:
+			start_game(False)
+		elif btn == 6:
+			start_game(True)
+		can_press_button.release()
 
 def get_solution(ms):
-    try:
-        output = subprocess.check_output(["./solver/a.out", ms], stderr=subprocess.STDOUT, timeout=0.5)
-        return int(output.decode())
-    except subprocess.TimeoutExpired:
-        return 0
+	try:
+		output = subprocess.check_output(["./solver/a.out", ms], stderr=subprocess.STDOUT, timeout=3/7)
+		print("Done!")
+		return int(output.decode())
+	except subprocess.TimeoutExpired:
+		print("Timed out");
+		return 0
 
 def next_move(gb, ms):
-    min_score = 21
-    min_columns = []
-    for i in range(7):
-        try:
-            gb[i].index(0)
-        except ValueError:
-            continue
-        sol = get_solution(ms + str(i + 1))
-        if sol == min_score:
-            min_columns.append(i)
-        elif sol < min_score:
-            min_score = sol
-            min_columns = [i]
-    return random.choice(min_columns)
+	min_score = 21
+	min_columns = []
+	for i in range(7):
+		try:
+			gb[i].index(0)
+		except ValueError:
+			continue
+		sol = get_solution(ms + str(i + 1))
+		if sol == min_score:
+			min_columns.append(i)
+		elif sol < min_score:
+			min_score = sol
+			min_columns = [i]
+	return random.choice(min_columns)
 
 def check_win(gb):
 	# Check horizontal win -
@@ -128,16 +141,17 @@ def check_win(gb):
 	return False
 
 def start_game(tp):
-	global two_player, gameboard, current_player, move_series
+	global two_player, gameboard, current_player, move_series, game_started
 	two_player = tp
 	gameboard = [[0 for i in range(6)] for j in range(7)]
 	current_player = 1
 	move_series = ""
+	game_started = True
 	update_lights()
 
 # Hardware setup
 
-pixels = neopixel.NeoPixel(board.D18, 64, brightness=0.1, pixel_order=neopixel.GRB, auto_write=False)
+pixels = neopixel.NeoPixel(board.D10, 64, brightness=0.1, pixel_order=neopixel.GRB, auto_write=False)
 pixels.fill(0)
 pixels.show()
 
@@ -156,22 +170,20 @@ GPIO.setup(BUTTONS, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 last_press = time.time()
 
 def button_callback(btn):
-	global last_press, game_started
-	print("Pressed")
+	global last_press
+	idx = BUTTONS.index(btn)
 	if time.time() - last_press >= COOLDOWN:
 		last_press = time.time()
-		idx = BUTTONS.index(btn)
 		if (can_press_button.locked()):
 			return
 		can_press_button.acquire()
-		if game_started:
-			button_press()
-		elif idx == 0 or idx == 6:
-			start_game(False)
-		can_press_button.release()
+		print("Actually pushed", idx)
+		t = threading.Thread(target=button_press, args=[idx], daemon=True)
+		t.start()
 
 def update_lights():
 	global gameboard, pixels, game_started
+	pixels.fill(0)
 	if game_started:
 		for i in range(42):
 			column = i // 6
@@ -181,20 +193,33 @@ def update_lights():
 				if gameboard[column][row] == 2 and time.time() % 1 < 0.5:
 					pixels[pixelindex] = [0, 255, 0]
 				else:
-					pixels[pixelindex] = [255, 0, 0]
+					pixels[pixelindex] = [128, 0, 0]
 			elif gameboard[column][row] < 0:
 				if gameboard[column][row] == -2 and time.time() % 1 < 0.5:
 					pixels[pixelindex] = [0, 255, 0]
 				else:
-					pixels[pixelindex] = [255, 255, 0]
+					pixels[pixelindex] = [128, 64, 0]
 			else:
 				pixels[pixelindex] = [0, 0, 0]
 	else:
-		pixels.fill([0, 64, 128])
+		ON_RED = [9, 17, 25, 33, 41, 49]
+		ON_YELLOW = [12, 13, 14, 22, 30, 29, 28, 36, 44, 52, 53, 54]
+		for i in ON_RED:
+			pixels[i] = [128, 0, 0]
+		for i in ON_YELLOW:
+			pixels[i] = [128, 64, 0]
+			
 	pixels.show()
 
 for i in BUTTONS:
 	GPIO.add_event_detect(i, GPIO.RISING, button_callback)
+
+update_lights()
+
+# while True:
+#   inp = int(input())
+#   print(game_started)
+#   button_press(inp - 1)
 
 input()
 
