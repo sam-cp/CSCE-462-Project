@@ -7,14 +7,15 @@ import subprocess
 import threading
 
 two_player = True
-gameboard = [[0 for i in range(6)] for j in range(7)]
+gameboard = []
 current_player = 1
 move_series = ""
 COOLDOWN = 0.5
 can_press_button = threading.Lock()
+game_started = False
 
 def button_press(btn):
-	global gameboard, current_player, move_series
+	global gameboard, current_player, move_series, game_started
 	try:
 		index = gameboard[btn].index(0)
 	except ValueError:
@@ -26,10 +27,8 @@ def button_press(btn):
 		for i in range(10):
 			update_lights()
 			time.sleep(0.5)
-		pixels.fill(0)
-		pixels.show()
-		gameboard = [[0 for i in range(6)] for j in range(7)]
-		current_player = 1
+		game_started = False
+		update_lights()
 	else:
 		current_player = -current_player
 		update_lights()
@@ -39,10 +38,8 @@ def button_press(btn):
 		else:
 			if len(move_series) == 42:
 				time.sleep(5)
-				pixels.fill(0)
-				pixels.show()
-				gameboard = [[0 for i in range(6)] for j in range(7)]
-				current_player = 1
+				game_started = False
+				update_lights()
 
 def get_solution(ms):
     try:
@@ -130,7 +127,13 @@ def check_win(gb):
 				return True
 	return False
 
-
+def start_game(tp):
+	global two_player, gameboard, current_player, move_series
+	two_player = tp
+	gameboard = [[0 for i in range(6)] for j in range(7)]
+	current_player = 1
+	move_series = ""
+	update_lights()
 
 # Hardware setup
 
@@ -153,34 +156,41 @@ GPIO.setup(BUTTONS, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 last_press = time.time()
 
 def button_callback(btn):
-	global last_press
+	global last_press, game_started
 	print("Pressed")
 	if time.time() - last_press >= COOLDOWN:
 		last_press = time.time()
+		idx = BUTTONS.index(btn)
 		if (can_press_button.locked()):
 			return
 		can_press_button.acquire()
-		button_press(BUTTONS.index(btn))
+		if game_started:
+			button_press()
+		elif idx == 0 or idx == 6:
+			start_game(False)
 		can_press_button.release()
 
 def update_lights():
-	global gameboard
-	for i in range(42):
-		column = i // 6
-		row = i % 6
-		pixelindex = (7 - row) * 8 + column
-		if gameboard[column][row] > 0:
-			if gameboard[column][row] == 2 and time.time() % 1 < 0.5:
-				pixels[pixelindex] = [0, 255, 0]
+	global gameboard, pixels, game_started
+	if game_started:
+		for i in range(42):
+			column = i // 6
+			row = i % 6
+			pixelindex = (7 - row) * 8 + column
+			if gameboard[column][row] > 0:
+				if gameboard[column][row] == 2 and time.time() % 1 < 0.5:
+					pixels[pixelindex] = [0, 255, 0]
+				else:
+					pixels[pixelindex] = [255, 0, 0]
+			elif gameboard[column][row] < 0:
+				if gameboard[column][row] == -2 and time.time() % 1 < 0.5:
+					pixels[pixelindex] = [0, 255, 0]
+				else:
+					pixels[pixelindex] = [255, 255, 0]
 			else:
-				pixels[pixelindex] = [255, 0, 0]
-		elif gameboard[column][row] < 0:
-			if gameboard[column][row] == -2 and time.time() % 1 < 0.5:
-				pixels[pixelindex] = [0, 255, 0]
-			else:
-				pixels[pixelindex] = [255, 255, 0]
-		else:
-			pixels[pixelindex] = [0, 0, 0]
+				pixels[pixelindex] = [0, 0, 0]
+	else:
+		pixels.fill([0, 64, 128])
 	pixels.show()
 
 for i in BUTTONS:
