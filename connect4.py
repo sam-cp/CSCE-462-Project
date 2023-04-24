@@ -54,7 +54,7 @@ def button_press(btn):
 
 def get_solution(ms):
 	try:
-		output = subprocess.check_output(["./solver/a.out", ms], stderr=subprocess.STDOUT, timeout=3/7)
+		output = subprocess.check_output(["/home/admin/Project/solver/a.out", ms], stderr=subprocess.STDOUT, timeout=3/7)
 		print("Done!")
 		return int(output.decode())
 	except subprocess.TimeoutExpired:
@@ -221,7 +221,8 @@ update_lights()
 #   print(game_started)
 #   button_press(inp - 1)
 
-input()
+while True:
+  time.sleep(60)
 
 pixels.fill(0)
 pixels.show()
