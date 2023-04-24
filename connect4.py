@@ -6,6 +6,17 @@ import random
 import subprocess
 import threading
 
+COLOR_RED = (128, 0, 0)
+COLOR_RED_DARK = (64, 0, 0)
+COLOR_YELLOW = (128, 64, 0)
+COLOR_YELLOW_DARK = (64, 32, 0)
+COLOR_GREEN_BRIGHT = (0, 255, 0)
+COLOR_GREEN_DARK = (0, 64, 0)
+COLOR_BLUE_BRIGHT = (0, 128, 255)
+COLOR_BLUE_DARK = (0, 32, 64)
+COLOR_BLACK = (0, 0, 0)
+COLOR_GRAY = (16, 16, 16)
+
 two_player = True
 gameboard = []
 current_player = 1
@@ -17,11 +28,10 @@ game_started = False
 def button_press(btn):
 	global gameboard, current_player, move_series, game_started, can_press_button
 	if game_started:
-		try:
-			index = gameboard[btn].index(0)
-		except ValueError:
+		if not drop_piece(btn, gameboard, current_player):
+			flash_col(btn, gameboard)
+			can_press_button.release()
 			return
-		gameboard[btn][index] = current_player
 		move_series += str(btn + 1)
 		won = check_win(gameboard)
 		if won:
@@ -51,6 +61,30 @@ def button_press(btn):
 		elif btn == 6:
 			start_game(True)
 		can_press_button.release()
+
+def flash_col(col, gb):
+	for i in range(6):
+		gb[col][i] *= 3
+		time.sleep(0.025)
+		update_lights()
+	time.sleep(0.2)
+	for i in range(6):
+		gb[col][i] //= 3
+		time.sleep(0.025)
+		update_lights()
+
+def drop_piece(col, gb, cp):
+	if gb[col][5] != 0:
+		return False
+	gb[col][5] = cp
+	row = 4
+	while row >= 0 and gb[col][row] == 0:
+		update_lights()
+		gb[col][row + 1] = 0
+		gb[col][row] = cp
+		time.sleep(0.05)
+		row -= 1
+	return True
 
 def get_solution(ms):
 	try:
@@ -152,17 +186,17 @@ def start_game(tp):
 # Hardware setup
 
 pixels = neopixel.NeoPixel(board.D10, 64, brightness=0.1, pixel_order=neopixel.GRB, auto_write=False)
-pixels.fill(0)
+pixels.fill(COLOR_BLACK)
 pixels.show()
 
 BUTTONS = [
-	23,
-	24,
-	25,
-	12,
-	16,
-	20,
-	21
+	27,
+	22,
+	5,
+	6,
+	13,
+	19,
+	26
 ]
 
 GPIO.setup(BUTTONS, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -185,29 +219,40 @@ def update_lights():
 	global gameboard, pixels, game_started
 	pixels.fill(0)
 	if game_started:
+		pixels[0] = COLOR_RED_DARK
+		pixels[1] = COLOR_BLUE_DARK
+		pixels[2] = COLOR_GREEN_DARK
+		pixels[3] = COLOR_BLUE_DARK
+		pixels[4] = COLOR_GREEN_DARK
+		pixels[5] = COLOR_BLUE_DARK
+		pixels[6] = COLOR_YELLOW_DARK
+		for i in range(7, 64, 8):
+			pixels[i] = COLOR_GRAY
 		for i in range(42):
 			column = i // 6
 			row = i % 6
 			pixelindex = (7 - row) * 8 + column
-			if gameboard[column][row] > 0:
+			if gameboard[column][row] == 3 or gameboard[column][row] == -3:
+				pixels[pixelindex] = COLOR_BLUE_BRIGHT
+			elif gameboard[column][row] > 0:
 				if gameboard[column][row] == 2 and time.time() % 1 < 0.5:
-					pixels[pixelindex] = [0, 255, 0]
+					pixels[pixelindex] = COLOR_GREEN_BRIGHT
 				else:
-					pixels[pixelindex] = [128, 0, 0]
+					pixels[pixelindex] = COLOR_RED
 			elif gameboard[column][row] < 0:
 				if gameboard[column][row] == -2 and time.time() % 1 < 0.5:
-					pixels[pixelindex] = [0, 255, 0]
+					pixels[pixelindex] = COLOR_GREEN_BRIGHT
 				else:
-					pixels[pixelindex] = [128, 64, 0]
+					pixels[pixelindex] = COLOR_YELLOW
 			else:
-				pixels[pixelindex] = [0, 0, 0]
+				pixels[pixelindex] = COLOR_BLACK
 	else:
 		ON_RED = [9, 17, 25, 33, 41, 49]
 		ON_YELLOW = [12, 13, 14, 22, 30, 29, 28, 36, 44, 52, 53, 54]
 		for i in ON_RED:
-			pixels[i] = [128, 0, 0]
+			pixels[i] = COLOR_RED
 		for i in ON_YELLOW:
-			pixels[i] = [128, 64, 0]
+			pixels[i] = COLOR_YELLOW
 			
 	pixels.show()
 
@@ -223,6 +268,3 @@ update_lights()
 
 while True:
   time.sleep(60)
-
-pixels.fill(0)
-pixels.show()
