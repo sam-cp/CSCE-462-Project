@@ -5,6 +5,8 @@ import time
 import random
 import subprocess
 import threading
+import imageio.v3 as imageio
+import numpy as np
 
 COLOR_RED = (128, 0, 0)
 COLOR_RED_DARK = (64, 0, 0)
@@ -38,22 +40,26 @@ def button_press(btn):
 			for i in range(10):
 				update_lights()
 				time.sleep(0.5)
+			if current_player == 1:
+				scroll_image("/home/admin/Project/images/red_wins.png", 15)
+			else:
+				scroll_image("/home/admin/Project/images/yellow_wins.png", 15)
+			game_started = False
+			update_lights()
+			can_press_button.release()
+		elif len(move_series) == 42:
+			for i in range(7):
+				flash_col(i, gameboard)
+			scroll_image("/home/admin/Project/images/draw.png", 10)
 			game_started = False
 			update_lights()
 			can_press_button.release()
 		else:
 			current_player = -current_player
 			update_lights()
-			if (not two_player):
-				if current_player == -1:
-					button_press(next_move(gameboard, move_series))
-				else:
-					can_press_button.release()
+			if (not two_player and current_player == -1):
+				button_press(next_move(gameboard, move_series))
 			else:
-				if len(move_series) == 42:
-					time.sleep(5)
-					game_started = False
-					update_lights()
 				can_press_button.release()
 	else:
 		if btn == 0:
@@ -256,10 +262,29 @@ def update_lights():
 			
 	pixels.show()
 
+def scroll_image(filename, speed):
+	global pixels
+	img = np.transpose(imageio.imread(filename), axes=[1, 0, 2])
+	first_col = 0
+	while first_col + 8 <= len(img):
+		for row in range(8):
+			for col in range(8):
+				pixels[row * 8 + col] = img[col + first_col][row][:3]
+		pixels.show()
+		time.sleep(1 / speed)
+		first_col += 1
+	time.sleep(2)
+
+
+can_press_button.acquire()
+
 for i in BUTTONS:
 	GPIO.add_event_detect(i, GPIO.RISING, button_callback)
 
+scroll_image("/home/admin/Project/images/connect4.png", 15)
 update_lights()
+
+can_press_button.release()
 
 # while True:
 #   inp = int(input())
