@@ -129,8 +129,11 @@ def check_win(gb):
 					all_same = False
 					break
 			if all_same:
-				for i in range(4):
+				p = gb[col][row]
+				i = 0
+				while col + i < 7 and gb[col + i][row] == p:
 					gb[col + i][row] *= 2
+					i += 1
 				return True
 	
 	
@@ -145,8 +148,11 @@ def check_win(gb):
 					all_same = False
 					break
 			if all_same:
-				for i in range(4):
+				p = gb[col][row]
+				i = 0
+				while row + i < 6 and gb[col][row + i] == p:
 					gb[col][row + i] *= 2
+					i += 1
 				return True
 	
 	# Check diagonal /
@@ -160,8 +166,11 @@ def check_win(gb):
 					all_same = False
 					break
 			if all_same:
-				for i in range(4):
+				p = gb[col][row]
+				i = 0
+				while col + i < 7 and row + i < 6 and gb[col + i][row + i] == p:
 					gb[col + i][row + i] *= 2
+					i += 1
 				return True
 	
 	# Check diagonal \
@@ -175,8 +184,11 @@ def check_win(gb):
 					all_same = False
 					break
 			if all_same:
-				for i in range(4):
+				p = gb[col][row]
+				i = 0
+				while col - i >= 0 and row + i < 6 and gb[col - i][row + i] == p:
 					gb[col - i][row + i] *= 2
+					i += 1
 				return True
 	return False
 
